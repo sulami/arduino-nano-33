@@ -13,7 +13,6 @@ use hal::clock::GenericClockController;
 use hal::delay::Delay;
 use hal::pac::{CorePeripherals, Peripherals};
 use hal::prelude::*;
-use hal::time::KiloHertz;
 
 // WiFi
 use hal::sercom::v2::spi;
@@ -21,10 +20,11 @@ use wifi_nina::transport;
 
 // Acellerometer
 use lexical_core as lexical;
-use lsm6ds33::{AccelerometerOutput, GyroscopeOutput, Lsm6ds33};
 
 mod usb;
 use usb::usb_log;
+
+mod gyro;
 
 #[entry]
 fn main() -> ! {
@@ -94,20 +94,14 @@ fn main() -> ! {
         _ => usb_log("failed to scan\n"),
     }
 
-    usb_log("Connecting to Gyro\n");
-    let i2c = bsp::i2c_master(
+    let mut gyro = gyro::setup_gyro(
         &mut clocks,
-        KiloHertz(100),
         peripherals.SERCOM4,
         &mut peripherals.PM,
         pins.sda,
         pins.scl,
-    );
-    let mut gyro = Lsm6ds33::new(i2c, 0x6A).unwrap();
-    gyro.set_gyroscope_output(GyroscopeOutput::Rate104).unwrap();
-    gyro.set_accelerometer_output(AccelerometerOutput::Rate104)
-        .unwrap();
-    usb_log("Connected to Gyro\n");
+    )
+    .unwrap();
 
     loop {
         // delay.delay_ms(500u16);
