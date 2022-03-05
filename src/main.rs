@@ -1,7 +1,6 @@
 #![no_std]
 #![no_main]
 
-use core::str;
 use core::time::Duration;
 
 use panic_halt as _;
@@ -14,9 +13,8 @@ use hal::delay::Delay;
 use hal::pac::{CorePeripherals, Peripherals};
 use hal::prelude::*;
 
-use lexical_core as lexical;
-
 mod gyro;
+mod orientation;
 mod usb;
 use usb::usb_log;
 mod wifi;
@@ -32,7 +30,16 @@ fn main() -> ! {
         &mut peripherals.NVMCTRL,
     );
     let pins = bsp::Pins::new(peripherals.PORT);
-    let mut led: bsp::Led = pins.led_sck.into();
+    // let mut led: bsp::Led = pins.led_sck.into();
+
+    let mut gyro = gyro::setup_gyro(
+        &mut clocks,
+        peripherals.SERCOM4,
+        &mut peripherals.PM,
+        pins.sda,
+        pins.scl,
+    )
+    .unwrap();
 
     unsafe {
         usb::setup_usb(
@@ -80,34 +87,45 @@ fn main() -> ! {
     //     _ => usb_log("failed to scan\n"),
     // }
 
-    let mut gyro = gyro::setup_gyro(
-        &mut clocks,
-        peripherals.SERCOM4,
-        &mut peripherals.PM,
-        pins.sda,
-        pins.scl,
-    )
-    .unwrap();
-
     loop {
-        // delay.delay_ms(500u16);
-        led.toggle().unwrap();
-        // while ! gyro.gyro_data_available().unwrap() {}
-        while !gyro.accel_data_available().unwrap() {}
-        // x-axis is along the length of the Arduino.
-        // x-axis plus is away from the usb, y is on the power led side, z is down
-        if let Ok((gx, gy, gz)) = gyro.read_accelerometer() {
-            let mut buf = [0u8; lexical::BUFFER_SIZE];
-            usb_log("\rgyro: ");
-            lexical::write(gx, &mut buf);
-            usb_log(str::from_utf8(&buf).unwrap());
-            usb_log(", ");
-            lexical::write(gy, &mut buf);
-            usb_log(str::from_utf8(&buf).unwrap());
-            usb_log(", ");
-            lexical::write(gz, &mut buf);
-            usb_log(str::from_utf8(&buf).unwrap());
-            usb_log("\n");
+        unsafe {
+            // NB Must be called at least once every 10ms to stay
+            // USB-compliant.
+            poll_usb(&mut gyro);
         }
+        // delay.delay_ms(500u16);
+        // led.toggle().unwrap();
+        // while ! gyro.gyro_data_available().unwrap() {}
+        // while !gyro.accel_data_available().unwrap() {}
+    }
+}
+
+unsafe fn poll_usb(gyro: &mut gyro::Gyro) {
+    if let Some(usb_dev) = usb::USB_BUS.as_mut() {
+        if let Some(serial) = usb::USB_SERIAL.as_mut() {
+            usb_dev.poll(&mut [serial]);
+
+            let mut buf = [0u8; 127];
+            if let Ok(count) = serial.read(&mut buf) {
+                handle_serial(core::str::from_utf8(&buf[..count - 1]).unwrap(), gyro);
+            }
+        }
+    };
+}
+
+fn handle_serial(s: &str, gyro: &mut gyro::Gyro) {
+    match s {
+        "ping" => usb_log("pong\n"),
+        "gyro" => log_gyro(gyro),
+        _ => usb_log("unknown command\n"),
+    };
+}
+
+fn log_gyro(gyro: &mut gyro::Gyro) {
+    if let Ok((gx, gy, gz)) = gyro.read_accelerometer() {
+        usb_log(orientation::display_orientation(orientation::orientation(
+            gx, gy, gz,
+        )));
+        usb_log("\n");
     }
 }

@@ -1,37 +1,17 @@
 use arduino_nano33iot as bsp;
 use bsp::hal;
 use hal::clock::GenericClockController;
-use hal::pac::{interrupt, CorePeripherals};
+// use hal::pac::interrupt;
+// use cortex_m::peripheral::NVIC;
+use hal::pac::CorePeripherals;
 use hal::usb::UsbBus;
 use usb_device::bus::UsbBusAllocator;
 use usb_device::prelude::*;
 use usbd_serial::{SerialPort, USB_CLASS_CDC};
 
-use cortex_m::peripheral::NVIC;
-
 static mut USB_ALLOCATOR: Option<UsbBusAllocator<UsbBus>> = None;
-static mut USB_BUS: Option<UsbDevice<UsbBus>> = None;
-static mut USB_SERIAL: Option<SerialPort<UsbBus>> = None;
-
-fn poll_usb() {
-    unsafe {
-        if let Some(usb_dev) = USB_BUS.as_mut() {
-            if let Some(serial) = USB_SERIAL.as_mut() {
-                usb_dev.poll(&mut [serial]);
-
-                // Make the other side happy
-                let mut buf = [0u8; 16];
-                let _ = serial.read(&mut buf);
-            }
-        };
-    };
-}
-
-#[allow(non_snake_case)]
-#[interrupt]
-fn USB() {
-    poll_usb();
-}
+pub static mut USB_BUS: Option<UsbDevice<UsbBus>> = None;
+pub static mut USB_SERIAL: Option<SerialPort<UsbBus>> = None;
 
 /// Setup a USB client device.
 pub unsafe fn setup_usb(
@@ -40,7 +20,7 @@ pub unsafe fn setup_usb(
     pm: &mut bsp::pac::PM,
     usb_dm: impl Into<bsp::UsbDm>,
     usb_dp: impl Into<bsp::UsbDp>,
-    core: &mut CorePeripherals,
+    _core: &mut CorePeripherals,
 ) {
     USB_ALLOCATOR = Some(bsp::usb_allocator(usb, clocks, pm, usb_dm, usb_dp));
     let bus_allocator = USB_ALLOCATOR.as_ref().unwrap();
@@ -53,8 +33,9 @@ pub unsafe fn setup_usb(
             .device_class(USB_CLASS_CDC)
             .build(),
     );
-    core.NVIC.set_priority(interrupt::USB, 1);
-    NVIC::unmask(interrupt::USB);
+    // NB For interrupt-driven USB polling.
+    // core.NVIC.set_priority(interrupt::USB, 1);
+    // NVIC::unmask(interrupt::USB);
 }
 
 /// Log to the USB host via serial.
@@ -68,3 +49,10 @@ pub fn usb_log(s: &str) {
         })
     });
 }
+
+// NB For interrupt-driven USB polling.
+// #[allow(non_snake_case)]
+// #[interrupt]
+// unsafe fn USB() {
+//     poll_usb();
+// }

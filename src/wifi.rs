@@ -2,35 +2,35 @@ use core::time::Duration;
 
 use arduino_nano33iot as bsp;
 use bsp::hal;
-use bsp::hal::gpio::v2::pin;
+use bsp::hal::gpio::v2::{pin, Alternate, Input, Output, Pin, Reset};
 
 use hal::sercom::v2::spi;
 use wifi_nina::transport;
 
 pub struct WifiPins {
-    pub miso: pin::Pin<pin::PA13, hal::gpio::v2::Reset>,
-    pub mosi: pin::Pin<pin::PA12, hal::gpio::v2::Reset>,
-    pub sck: pin::Pin<pin::PA15, hal::gpio::v2::Reset>,
-    pub ack: pin::Pin<pin::PA28, hal::gpio::v2::Reset>,
-    pub rst: pin::Pin<pin::PA08, hal::gpio::v2::Reset>,
-    pub cs: pin::Pin<pin::PA14, hal::gpio::v2::Reset>,
+    pub miso: Pin<pin::PA13, Reset>,
+    pub mosi: Pin<pin::PA12, Reset>,
+    pub sck: Pin<pin::PA15, Reset>,
+    pub ack: Pin<pin::PA28, Reset>,
+    pub rst: Pin<pin::PA08, Reset>,
+    pub cs: Pin<pin::PA14, Reset>,
 }
 
-type Spi<DELAY> = wifi_nina::transport::SpiTransport<
-    hal::sercom::v2::spi::Spi<
-        hal::sercom::v2::spi::Config<
-            hal::sercom::v2::spi::Pads<
+type Spi<DELAY> = transport::SpiTransport<
+    spi::Spi<
+        spi::Config<
+            spi::Pads<
                 hal::pac::SERCOM2,
-                hal::gpio::v2::Pin<pin::PA13, hal::gpio::v2::Alternate<hal::gpio::v2::C>>,
-                hal::gpio::v2::Pin<pin::PA12, hal::gpio::v2::Alternate<hal::gpio::v2::C>>,
-                hal::gpio::v2::Pin<pin::PA15, hal::gpio::v2::Alternate<hal::gpio::v2::C>>,
+                Pin<pin::PA13, Alternate<hal::gpio::v2::C>>,
+                Pin<pin::PA12, Alternate<hal::gpio::v2::C>>,
+                Pin<pin::PA15, Alternate<hal::gpio::v2::C>>,
             >,
         >,
-        hal::sercom::v2::spi::Duplex,
+        spi::Duplex,
     >,
-    hal::gpio::v2::Pin<pin::PA28, hal::gpio::v2::Input<hal::gpio::v2::Floating>>,
-    hal::gpio::v2::Pin<pin::PA08, hal::gpio::v2::Output<hal::gpio::v2::PushPull>>,
-    hal::gpio::v2::Pin<pin::PA14, hal::gpio::v2::Output<hal::gpio::v2::PushPull>>,
+    Pin<pin::PA28, Input<hal::gpio::v2::Floating>>,
+    Pin<pin::PA08, Output<hal::gpio::v2::PushPull>>,
+    Pin<pin::PA14, Output<hal::gpio::v2::PushPull>>,
     DELAY,
 >;
 

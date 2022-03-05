@@ -11,13 +11,15 @@ type I2C = hal::sercom::v1::I2CMaster4<
     pin::Pin<pin::PB09, pin::Alternate<pin::D>>,
 >;
 
+pub type Gyro = Lsm6ds33<I2C>;
+
 pub fn setup_gyro(
     clocks: &mut GenericClockController,
     sercom: bsp::pac::SERCOM4,
     pm: &mut bsp::pac::PM,
     sda: impl Into<bsp::Sda>,
     scl: impl Into<bsp::Scl>,
-) -> Result<Lsm6ds33<I2C>, &'static str> {
+) -> Result<Gyro, &'static str> {
     let i2c = bsp::i2c_master(clocks, KiloHertz(100), sercom, pm, sda, scl);
     match Lsm6ds33::new(i2c, 0x6A) {
         Ok(mut gyro) => {
@@ -35,3 +37,7 @@ pub fn setup_gyro(
         _ => Err("Gyroscope setup failed"),
     }
 }
+
+// pub fn gyro() -> Option<Gyro> {
+//     unsafe { GYRO }
+// }
