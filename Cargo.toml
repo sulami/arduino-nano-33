@@ -2,7 +2,7 @@
 authors = ["Robin Schroer <git@sulami.xyz>"]
 edition = "2018"
 readme = "README.md"
-name = "iot-test"
+name = "arduino-nano-33-iot"
 version = "0.1.0"
 
 [dependencies]
