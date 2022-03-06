@@ -3,7 +3,6 @@ use bsp::hal;
 use hal::clock::GenericClockController;
 // use hal::pac::interrupt;
 // use cortex_m::peripheral::NVIC;
-use hal::pac::CorePeripherals;
 use hal::usb::UsbBus;
 use usb_device::bus::UsbBusAllocator;
 use usb_device::prelude::*;
@@ -20,7 +19,7 @@ pub unsafe fn setup_usb(
     pm: &mut bsp::pac::PM,
     usb_dm: impl Into<bsp::UsbDm>,
     usb_dp: impl Into<bsp::UsbDp>,
-    _core: &mut CorePeripherals,
+    // _core: &mut CorePeripherals,
 ) {
     USB_ALLOCATOR = Some(bsp::usb_allocator(usb, clocks, pm, usb_dm, usb_dp));
     let bus_allocator = USB_ALLOCATOR.as_ref().unwrap();

@@ -15,6 +15,7 @@ use hal::prelude::*;
 
 mod gyro;
 mod orientation;
+mod time;
 mod usb;
 use usb::usb_log;
 mod wifi;
@@ -22,15 +23,18 @@ mod wifi;
 #[entry]
 fn main() -> ! {
     let mut peripherals = Peripherals::take().unwrap();
-    let mut core = CorePeripherals::take().unwrap();
+    let core = CorePeripherals::take().unwrap();
     let mut clocks = GenericClockController::with_internal_32kosc(
         peripherals.GCLK,
         &mut peripherals.PM,
         &mut peripherals.SYSCTRL,
         &mut peripherals.NVMCTRL,
     );
+    let mut delay = Delay::new(core.SYST, &mut clocks);
     let pins = bsp::Pins::new(peripherals.PORT);
-    // let mut led: bsp::Led = pins.led_sck.into();
+    let mut led: bsp::Led = pins.led_sck.into();
+    let gclk0 = clocks.gclk0();
+    let mut timer = time::Timer::new(peripherals.TC5, &mut clocks, &gclk0, &mut peripherals.PM);
 
     let mut gyro = gyro::setup_gyro(
         &mut clocks,
@@ -48,14 +52,10 @@ fn main() -> ! {
             &mut peripherals.PM,
             pins.usb_dm,
             pins.usb_dp,
-            &mut core,
+            // &mut core,
         );
     }
-    let mut delay = Delay::new(core.SYST, &mut clocks);
 
-    usb_log("usb initialised\n");
-
-    let gclk0 = clocks.gclk0();
     let clock = clocks.sercom2_core(&gclk0).unwrap();
 
     let wifi_pins = wifi::WifiPins {
@@ -71,7 +71,7 @@ fn main() -> ! {
         &peripherals.PM,
         peripherals.SERCOM2,
         wifi_pins,
-        |d: Duration| delay.delay_us(d.as_micros() as u32),
+        |d: Duration| delay.delay_ms(d.as_millis() as u32),
     );
 
     // match wifi.scan_networks() {
@@ -87,35 +87,51 @@ fn main() -> ! {
     //     _ => usb_log("failed to scan\n"),
     // }
 
+    let mut led_last_toggled = timer.millis();
+
+    led.set_high().unwrap();
     loop {
+        timer.tick();
+        let now = timer.millis();
+        if 500 < (now - led_last_toggled) {
+            led.toggle().unwrap();
+            led_last_toggled = now;
+        }
         unsafe {
             // NB Must be called at least once every 10ms to stay
             // USB-compliant.
-            poll_usb(&mut gyro);
+            poll_usb(&timer, &mut gyro);
         }
-        // delay.delay_ms(500u16);
-        // led.toggle().unwrap();
-        // while ! gyro.gyro_data_available().unwrap() {}
-        // while !gyro.accel_data_available().unwrap() {}
     }
 }
 
-unsafe fn poll_usb(gyro: &mut gyro::Gyro) {
+unsafe fn poll_usb(timer: &time::Timer, gyro: &mut gyro::Gyro) {
     if let Some(usb_dev) = usb::USB_BUS.as_mut() {
         if let Some(serial) = usb::USB_SERIAL.as_mut() {
             usb_dev.poll(&mut [serial]);
 
             let mut buf = [0u8; 127];
             if let Ok(count) = serial.read(&mut buf) {
-                handle_serial(core::str::from_utf8(&buf[..count - 1]).unwrap(), gyro);
+                handle_serial(
+                    core::str::from_utf8(&buf[..count - 1]).unwrap(),
+                    timer,
+                    gyro,
+                );
             }
         }
     };
 }
 
-fn handle_serial(s: &str, gyro: &mut gyro::Gyro) {
+fn handle_serial(s: &str, timer: &time::Timer, gyro: &mut gyro::Gyro) {
     match s {
         "ping" => usb_log("pong\n"),
+        "tick" => {
+            let mut buf = [0u8; 32];
+            usb_log("rtc: ");
+            lexical_core::write(timer.millis(), &mut buf);
+            usb_log(core::str::from_utf8(&buf).unwrap());
+            usb_log("\n");
+        }
         "gyro" => log_gyro(gyro),
         _ => usb_log("unknown command\n"),
     };
