@@ -18,7 +18,7 @@ version = "0.7.0"
 features = ["unproven", "usb"]
 
 [dependencies.lexical-core]
-version = "0.8"
+version = "1.0"
 default-features = false
 features = ["write-floats", "write-integers"]
 
